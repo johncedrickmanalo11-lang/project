@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Login - Student Management</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f0f4f8; margin:0; }
+    .card { width:360px; margin:80px auto; background:#fff; padding:28px; border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,0.08); text-align:center; }
+    h2 { color:#4bc0c0; margin:0 0 18px; }
+    input { width:100%; padding:12px; margin:8px 0; border-radius:6px; border:1px solid #ddd; }
+    button { width:48%; padding:12px; margin:10px 1%; border:none; border-radius:6px; background:#4bc0c0; color:#fff; font-weight:600; cursor:pointer; }
+    .msg { height:20px; margin-top:6px; font-weight:600; color:#d9534f; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Student Management System</h2>
+    <input id="loginUsername" type="text" placeholder="Username" />
+    <input id="loginPassword" type="password" placeholder="Password" />
+    <div>
+      <button onclick="registerUser()">Register</button>
+      <button onclick="loginUser()">Login</button>
+    </div>
+    <p id="authMsg" class="msg"></p>
+  </div>
+
+<script>
+const API = "http://192.168.1.4:5000";
+
+function showMsg(msg, color = "red") {
+  const el = document.getElementById("authMsg");
+  el.style.color = color;
+  el.textContent = msg;
+  if (msg) setTimeout(() => (el.textContent = ""), 3000);
+}
+
+async function registerUser() {
+  const username = document.getElementById("loginUsername").value.trim();
+  const password = document.getElementById("loginPassword").value.trim();
+  if (!username || !password) { showMsg("Fill all fields!"); return; }
+
+  try {
+    const res = await fetch(`${API}/register`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if (data.success) showMsg(data.message, "green");
+    else showMsg(data.message || "Registration failed");
+  } catch (err) {
+    console.error("Register error:", err);
+    showMsg("Server error. Make sure server is running.");
+  }
+}
+
+async function loginUser() {
+  const username = document.getElementById("loginUsername").value.trim();
+  const password = document.getElementById("loginPassword").value.trim();
+  if (!username || !password) { showMsg("Fill all fields!"); return; }
+
+  try {
+    const res = await fetch(`${API}/login`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      showMsg(data.message || "Login failed");
+      return;
+    }
+
+    // Success → redirect to dashboard
+    window.location.href = `${API}/dashboard`;
+
+  } catch (err) {
+    console.error("Login error:", err);
+    showMsg("Server error. Make sure server is running.");
+  }
+}
+</script>
+</body>
+</html>
