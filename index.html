@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Management Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #4bc0c0;
+            --primary-dark: #36A2EB;
+            --secondary: #ff6b6b;
+            --secondary-dark: #ff4b4b;
+            --admin: #9c5fff;
+            --admin-dark: #7b3fe4;
+            --light: #f0f4f8;
+            --dark: #333;
+            --gray: #ccc;
+            --white: #fff;
+            --shadow: 0 4px 12px rgba(0,0,0,0.1);
+            --radius: 12px;
+        }
+        
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--light);
+            margin: 0;
+            padding: 0;
+            color: var(--dark);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+
+        .card {
+            background: var(--white);
+            padding: 20px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 20px;
+        }
+   
+        #authDiv {
+            max-width: 400px;
+            margin: 50px auto;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        
+        #authDiv h2 {
+            color: var(--primary);
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        
+        #authDiv input {
+            width: 90%;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 6px;
+            border: 1px solid var(--gray);
+            outline: none;
+            font-size: 16px;
+            transition: border 0.3s;
+        }
+        
+        #authDiv input:focus {
+            border-color: var(--primary);
+        }
+        
+        #authDiv button {
+            width: 45%;
+            padding: 12px;
+            margin: 8px 2%;
+            border: none;
+            border-radius: 6px;
+            background: var(--primary);
+            color: var(--white);
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.3s;
+            font-weight: 600;
+        }
+        
+        #authDiv button:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+        
+        #authMsg {
+            margin-top: 10px;
+            font-weight: bold;
+            min-height: 20px;
+        }
+        
+        #dashboard {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .dashboard-header h2 {
+            color: var(--primary);
+            margin: 0;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .user-role {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .role-admin {
+            background: var(--admin);
+            color: white;
+        }
+        
+        .role-user {
+            background: var(--primary);
+            color: white;
+        }
+        
+        #logoutBtn {
+            padding: 10px 20px;
+            border-radius: 6px;
+            border: none;
+            background: var(--secondary);
+            color: var(--white);
+            cursor: pointer;
+            font-weight: 600;
+            transition: 0.3s;
+        }
+        
+        #logoutBtn:hover {
+            background: var(--secondary-dark);
+            transform: translateY(-2px);
+        }
+        
+        .form-box input, .form-box button {
+            width: 95%;
+            margin: 6px 0;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid var(--gray);
+            font-size: 14px;
+        }
+        
+        .form-box input:focus {
+            border-color: var(--primary);
+        }
+        
+        .form-box button {
+            width: 48%;
+            border: none;
+            background: var(--primary);
+            color: var(--white);
+            cursor: pointer;
+            transition: 0.3s;
+            font-weight: 600;
+        }
+        
+        .form-box button:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+        
+        .form-box button.secondary {
+            background: var(--secondary);
+        }
+        
+        .form-box button.secondary:hover {
+            background: var(--secondary-dark);
+        }
+        
+        .form-box button.admin {
+            background: var(--admin);
+        }
+        
+        .form-box button.admin:hover {
+            background: var(--admin-dark);
+        }
+  
+        .table-box {
+            max-height: 300px;
+            overflow-y: auto;
+            position: relative;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 12px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+        
+        th {
+            background: var(--primary);
+            color: var(--white);
+            position: sticky;
+            top: 0;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        tr:hover {
+            background-color: #f0f0f0;
+        }
+        
+        .action-btn {
+            padding: 6px 12px;
+            margin: 0 4px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: 0.2s;
+        }
+        
+        .edit-btn {
+            background: var(--primary);
+            color: var(--white);
+        }
+        
+        .edit-btn:hover {
+            background: var(--primary-dark);
+        }
+        
+        .delete-btn {
+            background: var(--secondary);
+            color: var(--white);
+        }
+        
+        .delete-btn:hover {
+            background: var(--secondary-dark);
+        }
+        
+        .graphs-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        
+        .graph-card {
+            flex: 1 1 300px;
+            height: 250px;
+            background: var(--white);
+            padding: 10px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .dashboard-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .user-info {
+                margin-top: 10px;
+            }
+            
+            #logoutBtn {
+                margin-top: 10px;
+            }
+            
+            .form-box button {
+                width: 100%;
+                margin-bottom: 5px;
+            }
+            
+            .graphs-container {
+                flex-direction: column;
+            }
+            
+            .graph-card {
+                flex: 1 1 100%;
+            }
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 20px;
+            color: #777;
+        }
+       
+        .student-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .form-group label {
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .form-group.full-width {
+            grid-column: 1 / -1;
+        }
+        
+        .form-actions {
+            grid-column: 1 / -1;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        
+        .admin-only {
+            display: none;
+        }
+        
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+<!-- LOGIN / REGISTER -->
+<div id="authDiv" class="card">
+    <h2>Student Management System</h2>
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+    <div>
+        <button onclick="register()">Register</button>
+        <button onclick="login()">Login</button>
+    </div>
+    <p id="authMsg"></p>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="container">
+    <div class="dashboard-header">
+        <h2>Student Management Dashboard</h2>
+        <div class="user-info">
+            <span id="currentUser">Welcome!</span>
+            <span id="userRole" class="user-role role-user">Student</span>
+            <button id="logoutBtn" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <!-- Student Input Form (Visible to all users) -->
+    <div id="studentInputForm" class="card">
+        <h3>Add Student</h3>
+        <div class="student-form">
+            <input type="hidden" id="editId">
+            <div class="form-group">
+                <label for="name">Name</label>
+                <input type="text" id="name" placeholder="Name">
+            </div>
+            <div class="form-group">
+                <label for="age">Age</label>
+                <input type="number" id="age" placeholder="Age" min="16" max="100">
+            </div>
+            <div class="form-group">
+                <label for="course">Course</label>
+                <input type="text" id="course" placeholder="Course">
+            </div>
+            <div class="form-group">
+                <label for="gwa">GWA</label>
+                <input type="number" step="0.01" id="gwa" placeholder="GWA" min="1.0" max="5.0">
+            </div>
+            <!-- Admin only fields -->
+            <div class="form-group admin-only">
+                <label for="studentUsername">Student Username</label>
+                <input type="text" id="studentUsername" placeholder="Student Username (for login)">
+            </div>
+            <div class="form-group admin-only">
+                <label for="studentPassword">Student Password</label>
+                <input type="password" id="studentPassword" placeholder="Student Password">
+            </div>
+            <div class="form-actions">
+                <button onclick="saveStudent()" id="saveBtn">Save Student</button>
+                <button onclick="clearForm()" class="secondary">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Student Table (Visible to all users) -->
+    <div id="studentTableCard" class="card">
+        <h3 id="tableTitle">Student Records</h3>
+        <div class="table-box">
+            <table id="studentTable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Age</th>
+                        <th>Course</th>
+                        <th>GWA</th>
+                        <th id="usernameHeader" style="display: none;">Username</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Student data will be populated here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Graphs (Only visible to admin) -->
+    <div id="graphsCard" class="card" style="display: none;">
+        <h3>Analytics</h3>
+        <div class="graphs-container">
+            <div class="graph-card">
+                <canvas id="ageChart"></canvas>
+            </div>
+            <div class="graph-card">
+                <canvas id="gwaChart"></canvas>
+            </div>
+            <div class="graph-card">
+                <canvas id="courseChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+        <script>
+    const API_BASE = "http://192.168.1.4:5000";
+
+    async function checkSession() {
+    try {
+        const response = await fetch(`${API_BASE}/check_session`, {
+            credentials: "include"
+        });
+
+        const data = await response.json();
+
+        if (!data.logged_in) {
+            // Show login form, hide dashboard
+            document.getElementById("authDiv").style.display = "block";
+            document.getElementById("dashboard").style.display = "none";
+            return;
+        }
+
+        // Show dashboard
+        document.getElementById("authDiv").style.display = "none";
+        document.getElementById("dashboard").style.display = "block";
+
+        // Display username + role
+        document.getElementById("currentUser").innerText = data.username;
+
+        if (data.role === "admin") {
+            document.getElementById("userRole").innerText = "Admin";
+            document.getElementById("userRole").classList.remove("role-user");
+            document.getElementById("userRole").classList.add("role-admin");
+
+            document.querySelectorAll(".admin-only").forEach(el => {
+                el.style.display = "block";
+            });
+
+            document.getElementById("usernameHeader").style.display = "table-cell";
+            document.getElementById("graphsCard").style.display = "block";
+        }
+
+        loadStudents();
+
+    } catch (err) {
+        console.error("Session check failed:", err);
+    }
+}
+
+    async function loadStudents() {
+        try {
+            const response = await fetch(`${API_BASE}/get_students`, {
+                credentials: "include"
+            });
+
+            const data = await response.json();
+
+            const tbody = document.getElementById("studentTableBody");
+            tbody.innerHTML = "";
+
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;">No student information found.</td></tr>`;
+                return;
+            }
+
+            data.forEach(s => {
+                const row = `
+                    <tr>
+                        <td>${s.name}</td>
+                        <td>${s.age}</td>
+                        <td>${s.course}</td>
+                        <td>${s.gwa}</td>
+                        <td>
+                            <button onclick="editStudent(${s.id}, '${s.name}', ${s.age}, '${s.course}', ${s.gwa})">Edit</button>
+                            <button onclick="deleteStudent(${s.id})">Delete</button>
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+
+            updateCharts(data); 
+
+        } catch (err) {
+            console.error("Load students error:", err);
+        }
+    }
+
+    async function saveStudent() {
+        const id = document.getElementById("studentId").value;
+        const name = document.getElementById("name").value.trim();
+        const age = document.getElementById("age").value;
+        const course = document.getElementById("course").value;
+        const gwa = document.getElementById("gwa").value;
+
+        // Admin only: username field for student
+        let username = null;
+        const userField = document.getElementById("studentUsername");
+        if (userField) username = userField.value.trim();
+
+        if (!name || !age || !course || !gwa) {
+            alert("Please fill out all fields!");
+            return;
+        }
+
+        const studentData = {
+            id: id || null,
+            name,
+            age,
+            course,
+            gwa,
+            username
+        };
+
+        const url = id 
+            ? `${API_BASE}/edit_student`
+            : `${API_BASE}/add_student`;
+
+        try {
+            const response = await fetch(url, {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(studentData)
+            });
+
+            const result = await response.json();
+
+            if (!result.success) {
+                alert(result.message);
+                return;
+            }
+
+            alert(result.message);
+            clearForm();
+            loadStudents();
+
+        } catch (err) {
+            alert("Operation failed! Make sure the server is running.");
+            console.error(err);
+        }
+    }
+
+    function editStudent(id, name, age, course, gwa) {
+        document.getElementById("studentId").value = id;
+        document.getElementById("name").value = name;
+        document.getElementById("age").value = age;
+        document.getElementById("course").value = course;
+        document.getElementById("gwa").value = gwa;
+
+        document.getElementById("saveBtn").innerText = "Update Student";
+    }
+
+    async function deleteStudent(id) {
+        if (!confirm("Are you sure you want to delete this student?")) return;
+
+        try {
+            const response = await fetch(`${API_BASE}/delete_student`, {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id })
+            });
+
+            const result = await response.json();
+
+            if (!result.success) return alert(result.message);
+
+            alert("Student deleted!");
+            loadStudents();
+
+        } catch (err) {
+            alert("Operation failed!");
+            console.error(err);
+        }
+    }
+
+    function clearForm() {
+        document.getElementById("studentId").value = "";
+        document.getElementById("name").value = "";
+        document.getElementById("age").value = "";
+        document.getElementById("course").value = "";
+        document.getElementById("gwa").value = "";
+        document.getElementById("saveBtn").innerText = "Save Student";
+    }
+
+    async function logout() {
+    await fetch(`${API_BASE}/logout`, { credentials: "include" });
+    document.getElementById("dashboard").style.display = "none";
+    document.getElementById("authDiv").style.display = "block";
+}
+
+
+    window.onload = checkSession;
+
+</script>
+</body>
+</html>
