@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dashboard - Student Management</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root { --primary:#4bc0c0; --primary-dark:#36A2EB; --secondary:#ff6b6b; --light:#f0f4f8; --white:#fff; --radius:12px; }
+    body { font-family: Arial, sans-serif; background:var(--light); margin:0; color:#333; }
+    .container { max-width:1100px; margin:20px auto; padding:20px; }
+    .card { background:var(--white); padding:20px; border-radius:var(--radius); box-shadow:0 6px 18px rgba(0,0,0,0.06); margin-bottom:18px; }
+    .dashboard-header { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .user-role { padding:6px 12px; border-radius:20px; color:#fff; font-weight:700; }
+    .role-admin { background:#9c5fff; }
+    .role-user { background:var(--primary); }
+    .form-actions { display:flex; gap:10px; justify-content:flex-end; }
+    input, button { padding:10px; border-radius:6px; border:1px solid #ddd; font-size:14px; }
+    button.primary { background:var(--primary); color:#fff; border:none; font-weight:700; }
+    table { width:100%; border-collapse:collapse; margin-top:12px; }
+    th, td { padding:12px; border:1px solid #eee; text-align:center; }
+    th { background:var(--primary); color:#fff; }
+    .empty-state { padding:18px; text-align:center; color:#777; }
+    .admin-only { display:none; }
+    .actions button{ margin:0 4px; padding:6px 10px; border-radius:6px; border:none; cursor:pointer;}
+    .edit-btn{ background:var(--primary); color:#fff; } .delete-btn{ background:var(--secondary); color:#fff; }
+    @media (max-width:700px){ .dashboard-header{flex-direction:column;align-items:flex-start} }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div id="dashboardCard" class="card">
+      <div class="dashboard-header">
+        <h2>Student Management Dashboard</h2>
+        <div>
+          <span id="currentUser">Welcome!</span>
+          <span id="userRole" class="user-role role-user">Student</span>
+          <button id="logoutBtn" onclick="logout()">Logout</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add / Edit Student -->
+    <div class="card">
+      <h3>Add Student</h3>
+      <input type="hidden" id="studentId" />
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div><label>Name</label><input id="name" placeholder="Name" /></div>
+        <div><label>Age</label><input id="age" type="number" min="16" max="100" /></div>
+        <div><label>Course</label><input id="course" placeholder="Course" /></div>
+        <div><label>GWA</label><input id="gwa" type="number" step="0.01" min="1.0" max="5.0" /></div>
+        <div class="admin-only"><label>Student Username (admin)</label><input id="studentUsername" placeholder="username" /></div>
+        <div class="admin-only">
+          <label>Student Password (admin)</label>
+          <input id="studentPassword" type="password" placeholder="password" autocomplete="new-password" />
+        </div>
+      </div>
+      <div class="form-actions" style="margin-top:12px;">
+        <button onclick="clearForm()">Clear</button>
+        <button class="primary" id="saveBtn" onclick="saveStudent()">Save Student</button>
+      </div>
+    </div>
+
+    <!-- Student Table -->
+    <div class="card">
+      <h3 id="tableTitle">Student Records</h3>
+      <div class="table-box">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th><th>Age</th><th>Course</th><th>GWA</th><th id="usernameHeader" style="display:none;">Username</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="studentTableBody">
+            <tr><td colspan="6" class="empty-state">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Charts (admin) -->
+    <div id="graphsCard" class="card" style="display:none;">
+      <h3>Analytics</h3>
+      <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:200px;"><canvas id="ageChart"></canvas></div>
+        <div style="flex:1; min-width:200px;"><canvas id="gwaChart"></canvas></div>
+        <div style="flex:1; min-width:200px;"><canvas id="courseChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const API = 'http://192.168.1.4:5000';
+
+function byId(id){return document.getElementById(id);}
+
+// ===== CHECK SESSION ON LOAD =====
+async function checkSessionOnLoad(){
+  try{
+    const res = await fetch(`${API}/check_session`, { credentials: 'include' });
+    const data = await res.json();
+    if(!data.logged_in){
+      window.location.href = `${API}/login-page`;
+      return;
+    }
+
+    byId('currentUser').innerText = `Welcome, ${data.username}!`;
+
+    if(data.role === 'admin'){
+      byId('userRole').innerText = 'Admin';
+      byId('userRole').classList.remove('role-user');
+      byId('userRole').classList.add('role-admin');
+      document.querySelectorAll('.admin-only').forEach(n=> n.style.display='block');
+      byId('usernameHeader').style.display = 'table-cell';
+      byId('graphsCard').style.display = 'block';
+    }
+
+    loadStudents();
+  }catch(err){
+    console.error('session check failed', err);
+    window.location.href = `${API}/login-page`;
+  }
+}
+
+// ===== LOAD STUDENTS =====
+async function loadStudents(){
+  try{
+    const res = await fetch(`${API}/get_students`, { credentials:'include' });
+    const students = await res.json();
+    const tbody = byId('studentTableBody');
+    tbody.innerHTML = '';
+
+    if(!students || students.length === 0){
+      tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No student information found.</td></tr>`;
+      return;
+    }
+
+    students.sort((a,b)=> (a.id||0) - (b.id||0));
+
+    students.forEach(s=>{
+      const usernameCell = (byId('userRole').innerText === 'Admin') ? `<td>${s.username||''}</td>` : '';
+      tbody.innerHTML += `
+        <tr>
+          <td>${s.name}</td>
+          <td>${s.age}</td>
+          <td>${s.course}</td>
+          <td>${Number(s.gwa).toFixed(2)}</td>
+          ${usernameCell}
+          <td>
+            <button class="edit-btn" onclick="editStudent(${s.id}, '${escapeHtml(s.name)}', ${s.age}, '${escapeHtml(s.course)}', ${parseFloat(s.gwa)})">Edit</button>
+            <button class="delete-btn" onclick="deleteStudent(${s.id})">Delete</button>
+          </td>
+        </tr>`;
+    });
+
+    if(byId('userRole').innerText === 'Admin') updateCharts(students);
+
+  }catch(err){
+    console.error('load students failed', err);
+    byId('studentTableBody').innerHTML = `<tr><td colspan="6" class="empty-state">Failed to load students.</td></tr>`;
+  }
+}
+
+function escapeHtml(s){
+  return String(s).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+// ===== SAVE STUDENT =====
+async function saveStudent(){
+  const id = byId('studentId').value || null;
+  const name = byId('name').value.trim();
+  const age = byId('age').value;
+  const course = byId('course').value.trim();
+  const gwa = byId('gwa').value;
+
+  const username = byId('studentUsername') ? byId('studentUsername').value.trim() : undefined;
+  const password = byId('studentPassword') ? byId('studentPassword').value : undefined;
+
+  if(!name || !age || !course || !gwa){
+    alert('Please fill all fields correctly.');
+    return;
+  }
+
+  const payload = { name, age: parseInt(age), course, gwa: parseFloat(gwa) };
+  if(id) payload.id = parseInt(id);
+  if(username) payload.username = username;
+  if(password) payload.password = password;
+
+  const url = id ? `${API}/edit_student` : `${API}/add_student`;
+
+  try{
+    const res = await fetch(url, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+    if(!data.success){ 
+      alert(data.message || 'Operation failed.');
+      return;
+    }
+
+    alert(data.message || 'Operation successful.');
+    clearForm();
+    loadStudents();
+
+  }catch(err){
+    console.error('save failed', err);
+    alert('Operation failed! Make sure server is running.');
+  }
+}
+
+// ===== EDIT STUDENT (prefill) =====
+function editStudent(id, name, age, course, gwa){
+  byId('studentId').value = id;
+  byId('name').value = name;
+  byId('age').value = age;
+  byId('course').value = course;
+  byId('gwa').value = gwa;
+  byId('saveBtn').innerText = 'Update Student';
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// ===== DELETE STUDENT =====
+async function deleteStudent(id){
+  if(!confirm('Are you sure you want to delete this student?')) return;
+
+  try{
+    const res = await fetch(`${API}/delete_student`, {
+      method:'POST',
+      credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ id })
+    });
+
+    const data = await res.json();
+    if(!data.success){ 
+      alert(data.message || 'Delete failed.');
+      return; 
+    }
+
+    alert(data.message || 'Deleted successfully.');
+    loadStudents();
+
+  }catch(err){
+    console.error('delete failed', err);
+    alert('Delete failed! Make sure server is running.');
+  }
+}
+
+// ===== CLEAR FORM =====
+function clearForm(){
+  byId('studentId').value = '';
+  byId('name').value = '';
+  byId('age').value = '';
+  byId('course').value = '';
+  byId('gwa').value = '';
+  if(byId('studentUsername')) byId('studentUsername').value = '';
+  if(byId('studentPassword')) byId('studentPassword').value = '';
+  byId('saveBtn').innerText = 'Save Student';
+}
+
+// ===== LOGOUT =====
+async function logout(){
+  try { 
+    await fetch(`${API}/logout`, { credentials: 'include' }); 
+    window.location.href = `${API}/login-page`;
+  } catch(e){ 
+    console.warn('logout request failed', e);
+    window.location.href = `${API}/login-page`;
+  }
+}
+
+// ===== CHARTS =====
+let ageChart, gwaChart, courseChart;
+function updateCharts(students){
+  if(ageChart) ageChart.destroy();
+  if(gwaChart) gwaChart.destroy();
+  if(courseChart) courseChart.destroy();
+
+  // Age Chart
+  const ageCounts = {};
+  students.forEach(s => ageCounts[s.age] = (ageCounts[s.age]||0)+1 );
+  const ageLabels = Object.keys(ageCounts);
+  const ageData = Object.values(ageCounts);
+  if(ageLabels.length){
+    ageChart = new Chart(byId('ageChart'), {
+      type:'pie',
+      data:{ 
+        labels: ageLabels.map(a=>`${a} yrs`), 
+        datasets:[{ 
+          data: ageData,
+          backgroundColor: ['#4bc0c0', '#36A2EB', '#FFCE56', '#FF6384', '#9966FF']
+        }] 
+      },
+      options:{ responsive:true, plugins:{legend:{position:'bottom'}}}
+    });
+  }
+
+  // GWA Chart
+  if(students.length){
+    gwaChart = new Chart(byId('gwaChart'), {
+      type:'bar',
+      data:{ 
+        labels: students.map(s=>s.name), 
+        datasets:[{ 
+          label:'GWA', 
+          data: students.map(s=>s.gwa),
+          backgroundColor: '#4bc0c0'
+        }] 
+      },
+      options:{ responsive:true, scales:{ y:{ beginAtZero:false, min:1, max:5, reverse:true } } }
+    });
+  }
+
+  // Course Chart
+  const courseCounts = {};
+  students.forEach(s=> courseCounts[s.course] = (courseCounts[s.course]||0)+1 );
+  const courseLabels = Object.keys(courseCounts);
+  const courseData = Object.values(courseCounts);
+  if(courseLabels.length){
+    courseChart = new Chart(byId('courseChart'), {
+      type:'pie',
+      data:{ 
+        labels: courseLabels, 
+        datasets:[{ 
+          data: courseData,
+          backgroundColor: ['#4bc0c0', '#36A2EB', '#FFCE56', '#FF6384', '#9966FF']
+        }] 
+      },
+      options:{ responsive:true, plugins:{legend:{position:'bottom'}}}
+    });
+  }
+}
+
+window.addEventListener('load', checkSessionOnLoad);
+</script>
+</body>
+</html>
